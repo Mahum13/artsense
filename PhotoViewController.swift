@@ -128,7 +128,6 @@ class PhotoViewController: UIViewController, UIImagePickerControllerDelegate, UI
     
     func compareDec(dec: Int, row: Int, col: Int) {
         // create a 2D array with coordinates and which colour it is closest to.
-        print("dec", dec)
         let closest = colorSound.min { abs($0.1 - dec) < abs($1.1 - dec) }
         pixelSound.append((row, col, closest!.key))
     }
@@ -175,13 +174,30 @@ class PhotoViewController: UIViewController, UIImagePickerControllerDelegate, UI
             }
         }
     
+//    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+//        if segue.identifier == "soundController" {
+//            if let navController = segue.destination as? UINavigationController {
+//                if let soundCont = navController.topViewController as? SoundController {
+//                    soundCont.pixelSound = pixelSound
+//                }
+//            }
+//        }
+//    }
+
     
     @IBAction func convertImage(_ sender: Any) {
-       print(pixels[0])
+        let soundCont = self.storyboard?.instantiateViewController(identifier: "soundCont") as! SoundController
+        self.navigationController?.pushViewController(soundCont, animated: true)
         
-    }
+        soundCont.pixelSound = pixelSound
+                
     
+    }
 }
+
+
+
+
     
 
 
