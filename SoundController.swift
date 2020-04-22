@@ -3,199 +3,292 @@
 //  ArtSense
 //
 //  Created by Mahum Hashmi on 08/04/2020.
-//  Copyright © 2020 Mahum Hashmi. All rights reserved.
+//  Copyright © 2020 Mahum Hashmi/Users/mahumhashmi/Documents/YEAR3/PROJECT/ArtSense/ArtSense/AudioKit/iOS/AudioKit For iOS.xcodeproj. All rights reserved.
 //
 
 import Foundation
 import UIKit
 import AVFoundation
+//import AudioUnit
+
+
+
 
 // https://stackoverflow.com/questions/55572894/produce-sounds-of-different-frequencies-in-swift
 class SoundController: UIViewController, UINavigationControllerDelegate {
-    var pixelSound: [(Int, Int, String)] = []
-   
-    var c: Double = 261.63
-    var cSharp: Double = 277.18
-    var d: Double = 293.66
-    var dSharp: Double = 311.13
-    var e: Double = 329.63
-    var f: Double = 349.23
-    var fSharp: Double = 369.99
-    var g: Double = 392.00
-    var gSharp: Double = 415.3
-    var a: Double = 440
-    var aSharp: Double = 466.16
-    var b: Double = 493.88
+    var myImage: UIImage!
+
+    @IBOutlet weak var home: DesignableButton!
+    @IBOutlet weak var imageView: UIImageView!
     
-    var tones = [String: Double]() // Dictionary containing notes as keys and frequencies as values
-   
     
+    
+    var imageCoordFreqs = [Point2D: Double]()
+    
+    
+    
+    private lazy var parameterLabel: UILabel = {
+        let label = UILabel()
+        label.textColor = .white
+        label.text = "Frequency: 0 Hz   Amplitude: 0%"
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private lazy var waveformSelectorSegmentedControl: UISegmentedControl = {
+        var images = [ #imageLiteral(resourceName: "icons8-sine-26.png"), #imageLiteral(resourceName: "icons8-triangle-24.png"), #imageLiteral(resourceName: "icons8-audio-wave-24"), #imageLiteral(resourceName: "icons8-square-24"), #imageLiteral(resourceName: "icons8-cleanup-noise-80")]
+        var offset = UIOffset(horizontal: 30, vertical: 40)
+        
+        images = images.map { $0.resizableImage(withCapInsets: .init(top: 0, left: 10, bottom: 0, right: 10), resizingMode: .stretch) }
+        let segmentedControl = UISegmentedControl(items: images)
+        segmentedControl.setContentPositionAdjustment(.zero, forSegmentType: .any, barMetrics: .default)
+        segmentedControl.addTarget(self, action: #selector(updateOscillatorWaveform), for: .valueChanged)
+        segmentedControl.selectedSegmentIndex = 0
+        segmentedControl.selectedSegmentTintColor =  UIColor(red: 0.1176470588, green: 0.5647058824, blue: 1, alpha: 1)
+        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        
+        return segmentedControl
+    }()
+    
+    
+
     override func viewDidLoad() {
+        //myImage.accessibilityTraits = accessibilityRespondsToUserInteraction
+        
+        home.center = CGPoint(x: view.frame.size.width / 2, y: view.frame.size.height - 130)
+        
+        
+        self.resizeImageView()
+        
+        
         //super.viewDidLoad()
-        tones = ["C": c, "C#": cSharp, "D": d, "D#": dSharp, "E": e, "F": f, "F#": fSharp, "G": g, "G#": gSharp, "A": a, "A#": aSharp, "B": b]
+        setUpView()
+        setUpSubviews()
+        imageView.image = myImage
+        
+    }
+    
+    func resizeImageView() {
+        imageView.frame.size = CGSize(width: myImage.size.width, height: myImage.size.height)
+    
+        imageView.center = CGPoint(x: view.frame.size.width / 2, y: view.frame.size.height / 2)
         
         
-        
-        self.pickFreq()
     }
     
     
+  
+    private func setUpView() {
+        view.backgroundColor = #colorLiteral(red: 0, green: 0, blue: 0, alpha: 1)
+        view.isMultipleTouchEnabled = false
+    }
     
-    func pickFreq() {
-        let myUnit = ToneOutputUnit()
-        for pixel in pixelSound {
-            let sound = pixel.2
-            let freq = self.tones[sound]
+    private func setUpSubviews() {
+        view.addSubview(waveformSelectorSegmentedControl)
+        view.addSubview(parameterLabel)
         
-            //DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            let vol = AVAudioSession.sharedInstance().outputVolume
-            myUnit.setFrequency(freq: freq!)
-            myUnit.setToneVolume(vol: Double(vol))
-            myUnit.setToneTime(t: 2000)
-            myUnit.enableSpeaker()
-            
-            
-            Timer.scheduledTimer(withTimeInterval: 3, repeats: false, block: myUnit.stop)
+        NSLayoutConstraint.activate([ waveformSelectorSegmentedControl.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10), waveformSelectorSegmentedControl.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -10), waveformSelectorSegmentedControl.widthAnchor.constraint(equalToConstant: 250), parameterLabel.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 20), parameterLabel.centerYAnchor.constraint(equalTo: waveformSelectorSegmentedControl.centerYAnchor, constant: 30)])
+        
+        
+    }
+    
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        guard let windowScene = (scene as? UIWindowScene) else { return }
+        let window = UIWindow(frame: windowScene.coordinateSpace.bounds)
+        window.windowScene = windowScene
+        window.rootViewController = PhotoViewController()
+        window.makeKeyAndVisible()
+    }
+    
+    @objc private func updateOscillatorWaveform() {
+        let waveform = Waveform(rawValue: waveformSelectorSegmentedControl.selectedSegmentIndex)
+        switch waveform {
+            case .sine: Synth.shared.setWaveformTo(Oscillator.sine)
+            case .triangle: Synth.shared.setWaveformTo(Oscillator.triangle)
+            case .sawtooth: Synth.shared.setWaveformTo(Oscillator.sawtooth)
+            case .square: Synth.shared.setWaveformTo(Oscillator.square)
+            case .whiteNoise: Synth.shared.setWaveformTo(Oscillator.whiteNoise)
+            default: break
         }
     }
+    
+    @objc private func setPlaybackStateTo(_ state: Bool) {
+        Synth.shared.volume = state ? 0.5: 0
+    }
+    
+    // Implement Touches Functions
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        setPlaybackStateTo(true)
+        guard let touch = touches.first else { return }
+        let coord = touch.location(in: view)
+        setSynthParametersFrom(coord)
+    }
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first else { return }
+        let coord = touch.location(in: view)
+        setSynthParametersFrom(coord)
+    }
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        setPlaybackStateTo(false)
+        parameterLabel.text = "Frequency: 0 Hz  Amplitude: 0%"
+    }
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        setPlaybackStateTo(false)
+        parameterLabel.text = "Frequency: 0 Hz  Amplitude: 0%"
+    }
+    
+   
+    
+    func getFrequency(point: CGPoint) -> Double {
+        let rangeX = (point.x-1.0) ... (point.x+1.0)
+        let rangeY = (point.y-1.0) ... (point.y+1.0)
+        
+        var freq: Double = 0.0
+        
+        for coord in imageCoordFreqs.keys {
+            //print(coord.x)
+            if rangeX.contains(coord.x) {
+                if rangeY.contains(coord.y) {
+                    freq = imageCoordFreqs[Point2D(x: coord.x, y: coord.y)]!
+                }
+            } 
+        }
+        return freq
+    }
+            
+    private func setSynthParametersFrom(_ coord: CGPoint) {
+        Oscillator.amplitude = Float((view.bounds.height - coord.y) / view.bounds.height)
+        Oscillator.frequency = Float(self.getFrequency(point: coord))
+        let amplitudePercent = Int(Oscillator.amplitude * 100)
+        let frequencyHertz = Int(Oscillator.frequency)
+        parameterLabel.text = "Frequency: \(frequencyHertz) Hz  Amplitude: \(amplitudePercent)%"
+        
+    }
+    
+//    @IBAction func backToCam(_ sender: Any) {
+//        let photoView = self.storyboard?.instantiateViewController(identifier: "photoView") as! PhotoViewController
+//        
+//        self.navigationController?.pushViewController(photoView, animated: true)
+//    
+//    }
+    
+    @IBAction func home(_ sender: Any) {
+        let vc = storyboard?.instantiateViewController(identifier: "mainController") as! ViewController
+        self.navigationController?.pushViewController(vc, animated: true)
+        
+    }
+    
 }
+
+
+class Synth {
+    public static let shared = Synth()
+    //shared.accessabilityTraits = UIAccessabilityTraitAllowsDirectInteraction
     
-
-import AudioUnit
-import AVFoundation
-
-final class ToneOutputUnit: NSObject {
-    var auAudioUnit: AUAudioUnit? = nil
-
-    var avActive = false // AVAudioSessionn active flag
-    var audioRunning = false // RemoteIO Audio Unit running flag
-
-    var sampleRate: Double = 44100.0 // Typical audio sample rate
-
-    var f0 = 880.0 // default frequency of tone "A"
-    var v0 = 16383.0 // default volume of tone: hhalf full scale
-
-    var toneCount: Int32 = 0 // number of samples of tones to play. 0 for silence
-
-    private var phY = 0.0 // save phase of sine wave to prevent clicking
-    private var interrupted = false // for restart from audio interruption notification
-
-    
-    // Audio frequencies below 500 Hz may be hard to hear from iPhone speaker
-    func setFrequency(freq: Double) {
-        f0 = freq
-    }
-
-    func duration(time: TimeInterval) -> TimeInterval {
-        return time
-        
-    }
-    func setToneVolume(vol: Double) {
-        v0 = vol * 32766.0 // 0.0 to 1.0
-    }
-
-    func setToneTime(t: Double) {
-        toneCount = Int32(t * sampleRate)
-    }
-
-    @objc func enableSpeaker() {
-        if audioRunning {
-            print("returned")
-            return // return if RemoteIO is already running
+    public var volume: Float {
+        set {
+            audioEngine.mainMixerNode.outputVolume = newValue
         }
-
-        do { // not running, so start hardware
-            let audioComponentDescription = AudioComponentDescription(componentType: kAudioUnitType_Output, componentSubType: kAudioUnitSubType_RemoteIO, componentManufacturer: kAudioUnitManufacturer_Apple, componentFlags: 0, componentFlagsMask: 0)
-
-            if auAudioUnit == nil {
-                try auAudioUnit = AUAudioUnit(componentDescription: audioComponentDescription)
-
-                let bus0 = auAudioUnit?.inputBusses[0]
-
-                // short int samples
-                // interleaved stereo
-                let audioFormat = AVAudioFormat(commonFormat: AVAudioCommonFormat.pcmFormatInt16, sampleRate: Double(sampleRate), channels: AVAudioChannelCount(2), interleaved: true)
-
-                try bus0?.setFormat(audioFormat ?? AVAudioFormat()) // for speaker bus
-
-                // AURenderPullInputBlock?
-                auAudioUnit?.outputProvider = { (actionFlags, timestamp, frameCount, inputBusNumber, inputDataList) -> AUAudioUnitStatus in self.fillSpeakerBuffer(inputDataList: inputDataList, frameCount: frameCount)
-                    return 0
+        get {
+            return audioEngine.mainMixerNode.outputVolume
+        }
+    }
+    
+    private var audioEngine: AVAudioEngine
+    private var time: Float = 0
+    private let sampleRate: Double
+    private let deltaTime: Float
+    
+    private lazy var sourceNode = AVAudioSourceNode { (_, _, frameCount, audioBufferList) -> OSStatus in
+        let ablPointer = UnsafeMutableAudioBufferListPointer(audioBufferList)
+        for frame in 0..<Int(frameCount) {
+            let sampleVal = self.signal(self.time)
+            self.time += self.deltaTime
+            for buffer in ablPointer {
+                let buf: UnsafeMutableBufferPointer<Float> = UnsafeMutableBufferPointer(buffer)
+                buf[frame] = sampleVal
             }
         }
-
-            auAudioUnit?.isOutputEnabled = true
-            toneCount = 0
-
-            try auAudioUnit?.allocateRenderResources() // v2 AudioUnitInitialize()
-            try auAudioUnit?.startHardware() // v2 AudioOutputUnitStart()
-            audioRunning = true
+        return noErr
+    }
+    
+    private var signal: Signal
+    
+    init(signal: @escaping Signal = Oscillator.sine) {
+        
+        audioEngine = AVAudioEngine()
+        
+        let mainMixer = audioEngine.mainMixerNode
+        let outputNode = audioEngine.outputNode
+        let format = outputNode.inputFormat(forBus: 0)
+        
+        sampleRate = format.sampleRate
+        deltaTime = 1 / Float(sampleRate)
+        
+        self.signal = signal
+        
+        let inputFormat = AVAudioFormat(commonFormat: format.commonFormat, sampleRate: sampleRate, channels: 1, interleaved: format.isInterleaved)
+        audioEngine.attach(sourceNode)
+        audioEngine.connect(sourceNode, to: mainMixer, format: inputFormat)
+        audioEngine.connect(mainMixer, to: outputNode, format: nil)
+        mainMixer.outputVolume = 0
+        do {
+            try audioEngine.start()
         } catch {
-            print("error 2 \(error)")
+            print("Count not start engine: \(error.localizedDescription)")
         }
-
     }
-
-    // Process RemoteIO Buffer for output
-    private func fillSpeakerBuffer(inputDataList: UnsafeMutablePointer<AudioBufferList>, frameCount: UInt32) {
-        let inputDataPtr = UnsafeMutableAudioBufferListPointer(inputDataList)
-        let nBuffers = inputDataPtr.count
-
-        if nBuffers > 0 {
-            let mBuffers: AudioBuffer = inputDataPtr[0]
-            let count = Int(frameCount)
-
-            // Speaker Output == play tone at frequency f0
-            if (self.v0 > 0) && (self.toneCount > 0) {
-                // audioStalled = false
-                var v = self.v0
-                if v > 32767 {
-                    v = 32767
-                }
-
-                let sz = Int(mBuffers.mDataByteSize)
-
-                var a = self.phY // capture from object for use inside block
-                let d = 2.0 * Double.pi * self.f0 / self.sampleRate // phase delta
-
-                let bufferPointer = UnsafeMutableRawPointer(mBuffers.mData)
-                if var bptr = bufferPointer {
-                    for i in 0..<(count) {
-                        let u = sin(a) // create a sine wave
-                        a += d
-                        if (a > 2.0 * Double.pi) {
-                            a -= 2.0 * Double.pi
-                        }
-                        let x = Int16(v * u + 0.5) // scale and round
-
-                        if (i < (sz/2)) {
-                            bptr.assumingMemoryBound(to: Int16.self).pointee = x
-                            bptr += 2 // increment by 2 bytes for nnext Int16 item
-                            bptr.assumingMemoryBound(to: Int16.self).pointee = x
-                            bptr += 2 // stereo, so fill both Left and Right channels
-                        }
-                    }
-                }
-
-                self.phY = a // save sine wave
-                self.toneCount -= Int32(frameCount) // decrement time remaining
-            } else {
-                // audioStalled = true
-                memset(mBuffers.mData, 0, Int(mBuffers.mDataByteSize)) // silence
-            }
-        }
-
-    }
-
-
-    func stop(NSTimer: Timer) {
-
-        if (audioRunning) {
-            auAudioUnit?.stopHardware()
-            audioRunning = false
-        }
+    
+    public func setWaveformTo(_ signal: @escaping Signal) {
+        self.signal = signal
     }
 }
 
+enum Waveform: Int {
+    case sine, triangle, sawtooth, square, whiteNoise
+}
 
+struct Oscillator {
+    static var amplitude: Float = 1
+    static var frequency: Float = 440 // 261.63
+    
+    static let sine = { (time: Float) -> Float in
+        return Oscillator.amplitude * sin(2.0 * Float.pi * Oscillator.frequency * time)
+    }
+    
+    static let triangle = { (time: Float) -> Float in
+        let period = 1.0 / Double(Oscillator.frequency)
+        let currentTime = fmod(Double(time), period)
+        let value = currentTime / period
+        
+        var result = 0.0
+        if value < 0.25 {
+            result = value * 4
+        } else if value < 0.75 {
+            result = 2.0 - (value * 4.0)
+        } else {
+            result = value * 4 - 4.0
+        }
+        return Oscillator.amplitude * Float(result)
+    }
+    
+    static let sawtooth = { (time: Float) -> Float in
+        let period = 1.0 / Oscillator.frequency
+        let currentTime = fmod(Double(time), Double(period))
+        return Oscillator.amplitude * ((Float(currentTime) / period) * 2 - 1.0)
+    }
+    
+    static let square = { (time: Float) -> Float in
+        let period = 1.0 / Double(Oscillator.frequency)
+        let currentTime = fmod(Double(time), period)
+        return ((currentTime / period) < 0.5) ? Oscillator.amplitude : -1.0 * Oscillator.amplitude
+    }
+    
+    static let whiteNoise = { (time: Float) -> Float in
+        return Oscillator.amplitude * Float.random(in: -1...1)
+    }
+}
 
+typealias Signal = (Float) -> (Float)
+
+ 
