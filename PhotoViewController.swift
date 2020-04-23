@@ -138,48 +138,57 @@ class PhotoViewController: UIViewController, UIImagePickerControllerDelegate, UI
         }
     }
     
+    // This function converts a UIImage to CGImage format
+    // @param image is the input UIImage
+    // @return is the converted CGImage
+    
     func toCGImage(image: UIImage) -> CGImage! {
-        guard let ciimage = CIImage(image: image) else { return nil }
-        let context = CIContext(options: nil)
-        return context.createCGImage(ciimage, from: ciimage.extent)
+        guard let ciimage = CIImage(image: image) else { return nil } // Attempt to convert UIImage to CIImage, return nil otherwise
+        let context = CIContext(options: nil) // Get CIImage context
+        return context.createCGImage(ciimage, from: ciimage.extent) // Convert CIImage to CGImage
     }
 
 
+    // This function resizes an image
+    // @param image is the UIImage being resized
+    // @param newWidth is the new width of resized image
+    // @return UIImage is the resized UIImage
     func resizeImage(image: UIImage, newWidth: CGFloat) -> UIImage {
-        let scale = newWidth / image.size.width
+        let scale = newWidth / image.size.width // Get scale of new image
         let newHeight = image.size.height * scale
-        UIGraphicsBeginImageContext(CGSize(width: newWidth, height: newHeight))
+        UIGraphicsBeginImageContext(CGSize(width: newWidth, height: newHeight)) // Context for resized image
         rect = CGRect(x: 0, y: 0, width: newWidth, height: newHeight)
         image.draw(in: rect)
         let newImage = UIGraphicsGetImageFromCurrentImageContext()!
         UIGraphicsEndImageContext()
-        resizedImage = newImage
+        resizedImage = newImage // Assign resized image to global variable
         return newImage
 
     }
     
+    // This function resizes the UIImageView according to the image it displays
+    // @param resizedImage is is the new resizedImage that is to be displayed
     func resizeImageView(resizedImage: UIImage) {
-        viewImage.frame.size = CGSize(width: resizedImage.size.width, height: resizedImage.size.height)
-        viewImage.center = CGPoint(x: view.frame.size.width / 2, y:view.frame.size.height / 2)
+        viewImage.frame.size = CGSize(width: resizedImage.size.width, height: resizedImage.size.height) // Resize UIImageView
+        viewImage.center = CGPoint(x: view.frame.size.width / 2, y:view.frame.size.height / 2) // Center the resized UIImageView
         
     }
     
+    // This function extracts the pixel data from the resized image to calculate the equivalent hexadecimal value of the colour
+    // This colour value is then converted to decimal and prepared to be compared to existing decimal values of colours
+    // Each pixel coordinate in the local frame is converted to the corresponding coordinate in the global frame
     //https://gist.github.com/bpercevic/3046ffe2b90a6cea8cfd
-    
     func pixelData() {
-        print("pixelData()")
-        let start = CFAbsoluteTimeGetCurrent()
-        let resizedImage = self.resizeImage(image: myImage, newWidth: 280)
-        self.resizeImageView(resizedImage: resizedImage)
+        let resizedImage = self.resizeImage(image: myImage, newWidth: 280) // Resize the image
+        self.resizeImageView(resizedImage: resizedImage) // Resize UIImageView displaying resized image
         
-        let cgimage = self.toCGImage(image: resizedImage)
+        let cgimage = self.toCGImage(image: resizedImage) // Convert image to CGImage
         
-        let bmp = cgimage!.dataProvider!.data
-        var data: UnsafePointer<UInt8> = CFDataGetBytePtr(bmp)
+        let bmp = cgimage!.dataProvider!.data // Data of CGImage
+        var data: UnsafePointer<UInt8> = CFDataGetBytePtr(bmp) // Pointer to data
         var r, g, b, a: UInt8
         
-        
-        
+        // For each pixel in the image, extract data
         for row in 0..<Int(cgimage!.height) {
             for col in 0..<Int(cgimage!.width) {
                 r = data.pointee
@@ -191,25 +200,26 @@ class PhotoViewController: UIViewController, UIImagePickerControllerDelegate, UI
                 a = data.pointee
                 data = data.advanced(by: 1)
                 
-                pixels.append(Pixel(r: r, g: g, b: b, a: a, row: row, col: col))
+                //pixels.append(Pixel(r: r, g: g, b: b, a: a, row: row, col: col))
                 
-                let color = Pixel(r: r, g: g, b: b, a: a, row: row, col: col).color
-                let components: [CGFloat] = color.cgColor.components!
+                let color = Pixel(r: r, g: g, b: b, a: a, row: row, col: col).color // Get colour value of pixel
+                let components: [CGFloat] = color.cgColor.components! // Get components of the colour
+                
                 // Convert colour to hexadecimal by using RGBA component values
                 let hex = self.toHex(pixel: Pixel(r: r, g: g, b: b, a: a, row: row, col: col), components: components)
+                
+                // Convert hexadecimal value to decimal value
                 let dec = Int(hex, radix: 16)
                 
                 // Convert points
                 let point = CGPoint(x: row, y: col)
                 let newPoint = view.convert(point, from: viewImage)
-                // Convert hexadecimal values of each colour to corresponding decimal value
                 
+                // Compare decimal values with existing decimal values of colours
                 self.compareDec(dec: dec!, point: newPoint)
                 
             }
         }
-        let diff = CFAbsoluteTimeGetCurrent() - start
-        print("Took \(diff) seconds")
     }
     
 
@@ -222,30 +232,27 @@ class PhotoViewController: UIViewController, UIImagePickerControllerDelegate, UI
         // create a 2D array with coordinates and which colour it is closest to.
         let closest = colorSound.min { abs($0.1 - dec) < abs($1.1 - dec) }
         
-        
         let newPoint = Point2D(x: point.x, y: point.y)
         
         pixelSound.updateValue(closest!.key, forKey: newPoint)
     }
     
+    // This function iterates through the dictionary containing each pixel and it's musical note, and adds the corresponding frequency
+    // finalFreqs dictionary contains each pixel coordinate in global frame, and its closest frequency
     func setClosestFreq() {
-        print("setClosestFreq()")
-        let start = CFAbsoluteTimeGetCurrent()
         for p in pixelSound {
-            let sound = p.1
-            let freq = Double(tones[sound]!)
-            finalFreqs.updateValue(freq, forKey: p.0)
-
+            let sound = p.1 // Get music note of pixel
+            let freq = Double(tones[sound]!) // Get frequency of this musical note from tones dictionary
+            finalFreqs.updateValue(freq, forKey: p.0) // Add coordinate and frequency to dictionary finalFreqs
         }
-        let diff = CFAbsoluteTimeGetCurrent() - start
-        print("Took \(diff) seconds")
     }
-
+    
+    
     // Convert RGBA values to hexadecimal
     // This function takes in the pixel and its RGBA components
     // This function returns a type String of the converted hexadecimal
-    // https://cocoacasts.com/from-hex-to-uicolor-and-back-in-swift
     func toHex(pixel: Pixel, components: [CGFloat]) -> String {
+        // Get the r, g, b a values from the pixel
         let r = Float(components[0])
         let g = Float(components[1])
         let b = Float(components[2])
@@ -255,6 +262,16 @@ class PhotoViewController: UIViewController, UIImagePickerControllerDelegate, UI
     }
     
    
+    // Create Pixel structure, which is the format every pixel follows, in reference to the local frame
+    // r: Red value
+    // g: Green value
+    // b: Blue value
+    // a: Alpha Value
+    // row: Which row it is in
+    // col: Which column it is in
+    // Assign a colour value
+    
+    // https://gist.github.com/bpercevic/3046ffe2b90a6cea8cfd
     struct Pixel {
             var r: Float
             var g: Float
@@ -275,31 +292,25 @@ class PhotoViewController: UIViewController, UIImagePickerControllerDelegate, UI
             var color: UIColor {
                 return UIColor(red: CGFloat(r/255.0), green: CGFloat(g/255.0), blue: CGFloat(b/255.0), alpha: CGFloat(a/255.0))
             }
-            
-            var description: String {
-                return "RGBA(\(r), \(g), \(b), \(a)"
-            }
         }
     
 
 
-    
+    // When the button 'Convert' is pressed, create a link to the next viewcontroller SoundController, and send the dictionary 'finalFreqs' and resized image to SoundController class
     @IBAction func convertImage(_ sender: Any) {
-        let soundCont = self.storyboard?.instantiateViewController(identifier: "soundCont") as! SoundController
-        self.navigationController?.pushViewController(soundCont, animated: true)
-        self.setClosestFreq()
+        let soundCont = self.storyboard?.instantiateViewController(identifier: "soundCont") as! SoundController // Create instance of SoundController class
+        self.navigationController?.pushViewController(soundCont, animated: true) // Push SoundController viewcontroller to Navigation Control stack
         
+        self.setClosestFreq()
         
         soundCont.myImage = resizedImage
         soundCont.imageCoordFreqs = finalFreqs
-        
-        
-        
-                
-    
     }
 }
 
+// Create a Hashable Point2D structure which is the format every coordinate follows
+// x: x value of coordinate
+// y: y value of coordinate
 struct Point2D: Hashable{
     var x : CGFloat = 0.0
     var y : CGFloat = 0.0
